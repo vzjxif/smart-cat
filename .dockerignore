@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# 数据目录
+data/
+
+# 编译产物
+smart-cat
+smart-cat.exe
+*.o
+*.a
+*.so
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 文档
+README.md
+NOTES.md
+CHANGELOG.md
+*.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# 脚本
+run.sh

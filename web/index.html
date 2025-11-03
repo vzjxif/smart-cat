@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART Cat - 硬盘健康监控</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .device-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .device-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .device-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .device-type {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .health-indicator {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .health-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .health-good { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .health-warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .health-critical { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+        .health-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .metric {
+            background: #f7f9fc;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+
+        .status-passed {
+            background: #d4f8e8;
+            color: #1e7e34;
+        }
+
+        .status-failed {
+            background: #ffe0e0;
+            color: #d32f2f;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 1200px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #f0f0f0;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #666;
+            transition: background 0.2s;
+        }
+
+        .close-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            height: 400px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #d32f2f;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .detail-metric {
+            background: #f7f9fc;
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 6px;
+        }
+
+        .detail-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f7f9fc;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .value-good { color: #1e7e34; }
+        .value-warning { color: #f57c00; }
+        .value-critical { color: #d32f2f; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐱 SMART Cat</h1>
+            <p class="subtitle">硬盘健康监控工具</p>
+        </header>
+
+        <div id="loading" class="loading">正在加载设备信息...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="deviceGrid" class="device-grid"></div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentChart = null;
+
+        // 加载设备列表
+        async function loadDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                const devices = await response.json();
+
+                document.getElementById('loading').style.display = 'none';
+
+                // 安全检查：devices 可能是 null 或 undefined
+                if (!devices || !Array.isArray(devices) || devices.length === 0) {
+                    document.getElementById('error').textContent = '未检测到支持 SMART 的设备';
+                    document.getElementById('error').style.display = 'block';
+                    return;
+                }
+
+                renderDevices(devices);
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = '加载失败: ' + error.message;
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        // 渲染设备卡片
+        function renderDevices(devices) {
+            const grid = document.getElementById('deviceGrid');
+            grid.innerHTML = '';
+
+            devices.forEach(device => {
+                const card = createDeviceCard(device);
+                grid.appendChild(card);
+            });
+        }
+
+        // 创建设备卡片
+        function createDeviceCard(device) {
+            const card = document.createElement('div');
+            card.className = 'device-card';
+
+            // 检查是否有错误
+            if (device.error_message) {
+                card.innerHTML = `
+                    <div class="device-header">
+                        <div class="device-name">${device.name}</div>
+                        <div class="device-type" style="background: #999;">USB</div>
+                    </div>
+                    <div class="error" style="margin: 20px 0;">
+                        ⚠️ ${device.error_message}
+                    </div>
+                    <p style="color: #666; font-size: 0.9rem;">
+                        该设备使用的 USB 桥接芯片不支持 SMART 数据透传。
+                    </p>
+                `;
+                return card;
+            }
+
+            card.onclick = () => showDeviceDetail(device);
+
+            // 加载实时数据
+            loadDeviceData(device.name).then(data => {
+                card.innerHTML = `
+                    <div class="device-header">
+                        <div class="device-name">${device.model || device.name}</div>
+                        <div class="device-type">${device.device_type}</div>
+                    </div>
+                    <div class="health-indicator">
+                        <div class="health-circle ${getHealthClass(data.health_percent)}">
+                            ${data.health_percent}%
+                        </div>
+                        <div class="health-label">健康度</div>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="metric-label">温度</div>
+                            <div class="metric-value">${data.temperature}°C</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">通电时间</div>
+                            <div class="metric-value">${formatHours(data.power_on_hours)}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">重映射扇区</div>
+                            <div class="metric-value ${data.reallocated_sectors > 0 ? 'value-warning' : ''}">${data.reallocated_sectors}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">待映射扇区</div>
+                            <div class="metric-value ${data.pending_sectors > 0 ? 'value-critical' : ''}">${data.pending_sectors}</div>
+                        </div>
+                    </div>
+                    <div class="status-badge ${data.smart_status === 'PASSED' ? 'status-passed' : 'status-failed'}">
+                        ${data.smart_status}
+                    </div>
+                `;
+            }).catch(err => {
+                card.innerHTML = `
+                    <div class="device-header">
+                        <div class="device-name">${device.name}</div>
+                        <div class="device-type" style="background: #999;">Error</div>
+                    </div>
+                    <div class="error">无法读取设备数据</div>
+                `;
+            });
+
+            return card;
+        }
+
+        // 加载设备数据
+        async function loadDeviceData(deviceName) {
+            const response = await fetch(`/api/smart/${encodeURIComponent(deviceName)}`);
+            return await response.json();
+        }
+
+        // 显示设备详情
+        async function showDeviceDetail(device) {
+            const modal = document.getElementById('modal');
+            const content = document.getElementById('modalContent');
+
+            modal.classList.add('active');
+            content.innerHTML = '<div class="loading">加载中...</div>';
+
+            try {
+                const data = await loadDeviceData(device.name);
+                const history = await loadHistory(data.device.serial);
+
+                content.innerHTML = renderDeviceDetail(data, history);
+
+                // 安全检查：history 可能是 null 或 undefined
+                if (history && Array.isArray(history) && history.length > 0) {
+                    renderChart(history);
+                }
+            } catch (error) {
+                content.innerHTML = `<div class="error">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 渲染设备详情
+        function renderDeviceDetail(data, history) {
+            let html = `
+                <h2>${data.device.model}</h2>
+                <p style="color: #666; margin-bottom: 20px;">序列号: ${data.device.serial} | 设备: ${data.device.name}</p>
+
+                <div class="info-grid">
+                    <div class="detail-metric">
+                        <div class="detail-label">健康度</div>
+                        <div class="detail-value ${getHealthValueClass(data.health_percent)}">${data.health_percent}%</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-label">温度</div>
+                        <div class="detail-value">${data.temperature}°C</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-label">通电时间</div>
+                        <div class="detail-value">${formatHours(data.power_on_hours)}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-label">通电次数</div>
+                        <div class="detail-value">${data.power_cycle_count}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-label">重映射扇区</div>
+                        <div class="detail-value ${data.reallocated_sectors > 0 ? 'value-warning' : ''}">${data.reallocated_sectors}</div>
+                    </div>
+                    <div class="detail-metric">
+                        <div class="detail-label">待映射扇区</div>
+                        <div class="detail-value ${data.pending_sectors > 0 ? 'value-critical' : ''}">${data.pending_sectors}</div>
+                    </div>
+                </div>
+            `;
+
+            // 安全检查：history 可能是 null、undefined 或空数组
+            if (history && Array.isArray(history) && history.length > 0) {
+                html += `
+                    <h3 style="margin-top: 30px;">历史趋势</h3>
+                    <div class="chart-container">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                `;
+            } else {
+                html += '<p style="color: #666; margin-top: 20px;">暂无历史数据</p>';
+            }
+
+            if (data.attributes && data.attributes.length > 0) {
+                html += `
+                    <h3 style="margin-top: 30px;">SMART 属性</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>属性名</th>
+                                <th>当前值</th>
+                                <th>最差值</th>
+                                <th>阈值</th>
+                                <th>原始值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.attributes.forEach(attr => {
+                    const failed = attr.when_failed ? 'value-critical' : '';
+                    html += `
+                        <tr class="${failed}">
+                            <td>${attr.id}</td>
+                            <td>${attr.name}</td>
+                            <td>${attr.value}</td>
+                            <td>${attr.worst}</td>
+                            <td>${attr.threshold}</td>
+                            <td>${attr.raw_value}</td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+            }
+
+            return html;
+        }
+
+        // 加载历史数据
+        async function loadHistory(serial) {
+            try {
+                const response = await fetch(`/api/history/${encodeURIComponent(serial)}`);
+                return await response.json();
+            } catch (error) {
+                return [];
+            }
+        }
+
+        // 渲染图表
+        function renderChart(history) {
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            const ctx = document.getElementById('historyChart');
+
+            const labels = history.map(r => new Date(r.timestamp).toLocaleString('zh-CN'));
+            const temps = history.map(r => r.temperature);
+            const health = history.map(r => r.health_percent);
+
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '温度 (°C)',
+                            data: temps,
+                            borderColor: '#f57c00',
+                            backgroundColor: 'rgba(245, 124, 0, 0.1)',
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: '健康度 (%)',
+                            data: health,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '温度 (°C)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '健康度 (%)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                    }
+                }
+            });
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
+        }
+
+        // 辅助函数
+        function getHealthClass(percent) {
+            if (percent >= 80) return 'health-good';
+            if (percent >= 50) return 'health-warning';
+            return 'health-critical';
+        }
+
+        function getHealthValueClass(percent) {
+            if (percent >= 80) return 'value-good';
+            if (percent >= 50) return 'value-warning';
+            return 'value-critical';
+        }
+
+        function formatHours(hours) {
+            const days = Math.floor(hours / 24);
+            return `${days}天`;
+        }
+
+        // 点击模态框外部关闭
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target.id === 'modal') {
+                closeModal();
+            }
+        });
+
+        // 启动时加载设备
+        loadDevices();
+
+        // 每分钟刷新一次
+        setInterval(loadDevices, 60000);
+    </script>
+</body>
+</html>

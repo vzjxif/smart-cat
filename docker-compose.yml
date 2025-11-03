@@ -1,0 +1,60 @@
+services:
+  smart-cat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smart-cat:latest
+    container_name: smart-cat
+
+    # 必须使用 privileged 模式访问主机硬盘
+    privileged: true
+
+    # 或者挂载特定设备（推荐，更安全）
+    # devices:
+    #   - /dev/sda:/dev/sda
+    #   - /dev/sdb:/dev/sdb
+    #   - /dev/sdc:/dev/sdc
+
+    ports:
+      - "10044:10044"
+
+    volumes:
+      # 持久化历史数据
+      - ./data:/app/data
+      # 挂载 /sys 用于设备扫描（Linux）
+      - /sys:/sys:ro
+
+    environment:
+      - TZ=Asia/Shanghai
+
+    restart: unless-stopped
+
+    # 健康检查
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:10044/",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    # 资源限制（可选）
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.1"
+          memory: 32M
+# 如果需要在 Docker Swarm 或其他编排系统中使用
+# networks:
+#   default:
+#     driver: bridge
