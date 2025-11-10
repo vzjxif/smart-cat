@@ -147,6 +147,8 @@ func handleDevices(w http.ResponseWriter, r *http.Request) {
 					Model:      "无法读取",
 					Serial:     "unknown",
 					DeviceType: "Unknown",
+					CapacityGB: device.CapacityGB,
+					IsExternal: device.IsExternal,
 				},
 				HasHistory:   false,
 				Error:        err.Error(),
